@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Updater Store
+Comment=Gerencie seus aplicativos
+Exec=/usr/local/bin/updater-client
+Icon=system-software-install
+Terminal=false
+Type=Application
+Categories=System;Utility;
