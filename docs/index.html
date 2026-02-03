@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Updater Manager | Instalação</title>
+    <meta name="description" content="O gerenciador de atualizações automatizado para Linux.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+
+    <div class="background-glow"></div>
+
+    <main class="container">
+        <header>
+            <div class="badge">v1.0.1 Stable</div>
+            <h1>Updater Manager</h1>
+            <p class="subtitle">Gerenciamento de pacotes e auto-update inteligente para Linux.</p>
+        </header>
+
+        <section class="install-section">
+            <p class="label">Instale agora via terminal:</p>
+            
+            <div class="terminal-window" onclick="copyCommand()">
+                <div class="terminal-header">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                </div>
+                <div class="terminal-body">
+                    <span class="prompt">$</span>
+                    <code id="cmd">curl -fsSL https://raw.githubusercontent.com/luizhanauer/updater-manager/main/get.sh | sh</code>
+                    <button id="copyBtn" aria-label="Copiar comando">
+                        <i data-feather="copy"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="toast">Copiado para a área de transferência!</div>
+        </section>
+
+        <footer>
+            <a href="https://github.com/luizhanauer/updater-manager" target="_blank" class="github-link">
+                <i data-feather="github"></i> Ver no GitHub
+            </a>
+        </footer>
+    </main>
+
+    <script src="script.js"></script>
+    <script>feather.replace()</script>
+</body>
+</html>
