@@ -1,0 +1,23 @@
+[Unit]
+Description=Linux Updater Service (Daemon)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+# O Daemon roda com este grupo
+Group=linux-updater
+
+# SEGURANÇA MÁXIMA: 
+# O systemd cria a pasta /run/linux-updater apenas quando o serviço inicia
+# Permissão 0770 = Root e Grupo acessam, outros são bloqueados.
+RuntimeDirectory=linux-updater
+RuntimeDirectoryMode=0770
+
+ExecStart=/usr/local/bin/updater-daemon
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

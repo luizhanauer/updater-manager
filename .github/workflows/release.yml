@@ -1,0 +1,90 @@
+name: Release Updater Manager
+
+on:
+  push:
+    tags:
+      - 'v*' # Dispara apenas quando subir tags como v1.0.0, v2.3.1, etc.
+  workflow_dispatch: # Permite rodar manualmente clicando num botão se precisar
+
+permissions:
+  contents: write # Permissão para criar Releases e subir arquivos
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout do Código
+        uses: actions/checkout@v6.0.2
+
+      - name: 🐹 Configurar Go
+        uses: actions/setup-go@v6.2.0
+        with:
+          go-version: '1.25.6'
+
+      - name: 🟢 Configurar Node (para o Wails/Vue)
+        uses: actions/setup-node@v6.2.0
+        with:
+          node-version: '22'
+
+      - name: 🔧 Instalar Dependências do Linux (Wails)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev build-essential
+
+      - name: 🔨 Instalar Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      # --- COMPILAÇÃO DO DAEMON ---
+      - name: 🔨 Compilar Daemon
+        run: |
+          cd daemon
+          go mod tidy
+          # Compila estático e otimizado (-s -w)
+          go build -ldflags="-s -w" -o ../dist/bin/updater-daemon
+
+      # --- COMPILAÇÃO DO CLIENT ---
+      - name: 🔨 Compilar Client
+        run: |
+          cd client
+          go mod tidy
+          # O Wails compila o Frontend + Backend
+          wails build -platform linux/amd64 -tags webkit2_41 -clean -o updater-client
+          
+          # Move o binário gerado para a pasta de distribuição
+          # O Wails geralmente solta em client/build/bin/
+          mv build/bin/updater-client ../dist/bin/
+
+      # --- EMPACOTAMENTO ---
+      - name: 📦 Criar Tarball (.tar.gz)
+        run: |
+          # Copia os arquivos de instalação para a pasta dist
+          cp install.sh dist/
+          cp updater-daemon.service dist/
+          cp updater-client.desktop dist/
+          
+          # Garante permissão de execução
+          chmod +x dist/install.sh
+          chmod +x dist/bin/*
+          
+          # Define o nome do arquivo baseado na Tag (ex: updater-manager_v1.0.0_linux_amd64.tar.gz)
+          VERSION=${{ github.ref_name }}
+          ARCH="amd64"
+          FILENAME="updater-manager_linux_${ARCH}.tar.gz"
+          
+          # Entra na pasta dist e compacta tudo
+          cd dist
+          tar -czf ../$FILENAME *
+          
+          # Salva o nome do arquivo numa variável de ambiente para o próximo passo usar
+          echo "ASSET_PATH=$FILENAME" >> $GITHUB_ENV
+
+      # --- PUBLICAÇÃO ---
+      - name: 🚀 Criar Release no GitHub
+        uses: softprops/action-gh-release@v2.5.0
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ${{ env.ASSET_PATH }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
