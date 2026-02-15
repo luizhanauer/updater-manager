@@ -1,6 +1,9 @@
 name: Generate Portfolio Screenshot
 on: 
-  workflow_dispatch: # Execução manual
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   screenshot:
