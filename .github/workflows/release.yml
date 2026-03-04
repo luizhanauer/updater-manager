@@ -97,6 +97,8 @@ jobs:
 
   # --- DEPLOY DO SITE NO GITHUB PAGES ---
   deploy-pages:
+    needs: build-and-release
+    if: always() && (needs.build-and-release.result == 'success' || needs.build-and-release.result == 'skipped')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
