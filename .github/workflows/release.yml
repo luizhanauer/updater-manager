@@ -3,17 +3,18 @@ name: Release and Deploy Pages
 on:
   push:
     branches:
-      - main # Necessário para atualizar o site sem precisar criar uma tag
+      - main
     tags:
-      - 'v*' # Dispara a Release do binário
+      - 'v*'
   workflow_dispatch:
 
 permissions:
-  contents: write # Permissão para Releases
-  pages: write    # Permissão para o GitHub Pages
-  id-token: write # Permissão de autenticação do Pages
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
+  # JOB 1: COMPILAÇÃO E RELEASE (Roda só em Tags)
   build-and-release:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -27,12 +28,12 @@ jobs:
         with:
           go-version: '1.25.6'
 
-      - name: 🟢 Configurar Node (para o Wails/Vue)
+      - name: 🟢 Configurar Node
         uses: actions/setup-node@v6.2.0
         with:
           node-version: '22'
 
-      - name: 🔧 Instalar Dependências do Linux (Wails)
+      - name: 🔧 Instalar Dependências do Linux
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential
@@ -40,53 +41,38 @@ jobs:
       - name: 🔨 Instalar Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-      # --- COMPILAÇÃO DO DAEMON ---
       - name: 🔨 Compilar Daemon
         run: |
-          # CORREÇÃO: Criar o diretório antes de compilar
           mkdir -p dist/bin
-          
           cd daemon
           go mod tidy
-          # Compila estático e otimizado (-s -w)
           go build -ldflags="-s -w" -o ../dist/bin/updater-daemon
 
-      # --- COMPILAÇÃO DO CLIENT ---
       - name: 🔨 Compilar Client
         run: |
           cd client
           go mod tidy
-          # O Wails compila o Frontend + Backend
           wails build -platform linux/amd64 -tags webkit2_41 -clean -o updater-client
-          
-          # Move o binário gerado para a pasta de distribuição
           mv build/bin/updater-client ../dist/bin/
 
-      # --- EMPACOTAMENTO ---
       - name: 📦 Criar Tarball (.tar.gz)
         run: |
-          # Copia os arquivos de instalação para a pasta dist
-          cp install.sh dist/
-          cp updater-daemon.service dist/
-          cp updater-client.desktop dist/
+          # CORREÇÃO: Apontando para a pasta build/ correta
+          cp build/install.sh dist/
+          cp build/updater-daemon.service dist/
+          cp build/updater-client.desktop dist/
           
-          # Garante permissão de execução
           chmod +x dist/install.sh
           chmod +x dist/bin/*
           
-          # Define o nome do arquivo baseado na Tag
           VERSION=${{ github.ref_name }}
           ARCH="amd64"
           FILENAME="updater-manager_linux_${ARCH}.tar.gz"
           
-          # Entra na pasta dist e compacta tudo
           cd dist
           tar -czf ../$FILENAME *
-          
-          # Salva o nome do arquivo numa variável de ambiente
           echo "ASSET_PATH=$FILENAME" >> $GITHUB_ENV
 
-      # --- PUBLICAÇÃO ---
       - name: 🚀 Criar Release no GitHub
         uses: softprops/action-gh-release@v2.5.0
         with:
@@ -95,7 +81,7 @@ jobs:
           draft: false
           prerelease: false
 
-  # --- DEPLOY DO SITE NO GITHUB PAGES ---
+  # JOB 2: DEPLOY DO SITE (Aguarda o Job 1 terminar)
   deploy-pages:
     needs: build-and-release
     if: always() && (needs.build-and-release.result == 'success' || needs.build-and-release.result == 'skipped')
@@ -103,22 +89,16 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    
     steps:
       - name: 📥 Checkout do Código
         uses: actions/checkout@v6.0.2
 
       - name: 🏗️ Montar Estrutura do Site
         run: |
-          # Cria a estrutura temporária
           mkdir -p _site/assets
-          
-          # Copia os arquivos do site
           cp -r docs/* _site/
-          
-          # Copia o script para a raiz do site
           cp get.sh _site/
-          
-          # Mapeia as imagens corretamente
           cp -r portfolio-assets/* _site/assets/ 2>/dev/null || true
 
       - name: 📤 Upload do Artefato
