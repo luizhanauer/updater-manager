@@ -64,7 +64,13 @@ onMounted(() => {
            const s = statusMap[app.id];
            
            app.status = s.state;
-           app.message = s.message;
+           // Prioriza a mensagem de erro detalhada se o estado for 'error'
+           if (s.state === 'error' && s.error) {
+             app.message = s.error;
+           } else {
+             app.message = s.message;
+           }
+
            app.local_version = s.current_version;
            app.is_installed = !!s.current_version;
            app.auto_update = s.auto_update;
