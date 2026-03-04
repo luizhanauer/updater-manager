@@ -3,31 +3,32 @@ name: Release and Deploy Pages
 on:
   push:
     branches:
-      - main
+      - main # Necessário para atualizar o site sem precisar criar uma tag
     tags:
-      - 'v*'
+      - 'v*' # Dispara a Release do binário
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: write # Permissão para Releases
+  pages: write    # Permissão para o GitHub Pages
+  id-token: write # Permissão de autenticação do Pages
 
 jobs:
   build-and-release:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+
     steps:
       - name: 📥 Checkout do Código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: 🐹 Configurar Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6.2.0
         with:
-          go-version: '1.23' # Versão estável recomendada
+          go-version: '1.25.6'
 
       - name: 🟢 Configurar Node (para o Wails/Vue)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.2.0
         with:
           node-version: '22'
 
@@ -39,43 +40,62 @@ jobs:
       - name: 🔨 Instalar Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
+      # --- COMPILAÇÃO DO DAEMON ---
       - name: 🔨 Compilar Daemon
         run: |
+          # CORREÇÃO: Criar o diretório antes de compilar
           mkdir -p dist/bin
+          
           cd daemon
           go mod tidy
+          # Compila estático e otimizado (-s -w)
           go build -ldflags="-s -w" -o ../dist/bin/updater-daemon
 
+      # --- COMPILAÇÃO DO CLIENT ---
       - name: 🔨 Compilar Client
         run: |
           cd client
           go mod tidy
+          # O Wails compila o Frontend + Backend
           wails build -platform linux/amd64 -tags webkit2_41 -clean -o updater-client
+          
+          # Move o binário gerado para a pasta de distribuição
           mv build/bin/updater-client ../dist/bin/
 
+      # --- EMPACOTAMENTO ---
       - name: 📦 Criar Tarball (.tar.gz)
         run: |
+          # Copia os arquivos de instalação para a pasta dist
           cp install.sh dist/
           cp updater-daemon.service dist/
           cp updater-client.desktop dist/
+          
+          # Garante permissão de execução
           chmod +x dist/install.sh
           chmod +x dist/bin/*
           
+          # Define o nome do arquivo baseado na Tag
           VERSION=${{ github.ref_name }}
-          FILENAME="updater-manager_linux_amd64.tar.gz"
+          ARCH="amd64"
+          FILENAME="updater-manager_linux_${ARCH}.tar.gz"
           
+          # Entra na pasta dist e compacta tudo
           cd dist
           tar -czf ../$FILENAME *
+          
+          # Salva o nome do arquivo numa variável de ambiente
           echo "ASSET_PATH=$FILENAME" >> $GITHUB_ENV
 
+      # --- PUBLICAÇÃO ---
       - name: 🚀 Criar Release no GitHub
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.5.0
         with:
           files: ${{ env.ASSET_PATH }}
           generate_release_notes: true
           draft: false
           prerelease: false
 
+  # --- DEPLOY DO SITE NO GITHUB PAGES ---
   deploy-pages:
     runs-on: ubuntu-latest
     environment:
@@ -83,24 +103,21 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: 📥 Checkout do Código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: 🏗️ Montar Estrutura do Site
         run: |
-          # 1. Cria diretório temporário para o site
+          # Cria a estrutura temporária
           mkdir -p _site/assets
           
-          # 2. Copia os arquivos base do HTML (da pasta docs)
+          # Copia os arquivos do site
           cp -r docs/* _site/
           
-          # 3. Copia o script de instalação para a RAIZ do site
+          # Copia o script para a raiz do site
           cp get.sh _site/
           
-          # 4. Mapeia portfolio-assets para /assets no site final
-          cp -r portfolio-assets/* _site/assets/
-          
-          echo "Estrutura do site criada:"
-          ls -R _site
+          # Mapeia as imagens corretamente
+          cp -r portfolio-assets/* _site/assets/ 2>/dev/null || true
 
       - name: 📤 Upload do Artefato
         uses: actions/upload-pages-artifact@v3
